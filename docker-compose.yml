@@ -1,0 +1,83 @@
+services:
+  kafka:
+    image: apache/kafka:3.9.0
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=gigdb
+      - POSTGRES_USER=gig
+      - POSTGRES_PASSWORD=gig123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gig -d gigdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rest-api:
+    build: ./rest-api
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gigdb
+      - SPRING_DATASOURCE_USERNAME=gig
+      - SPRING_DATASOURCE_PASSWORD=gig123
+    volumes:
+      - ./data:/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  nifi-deploy:
+    image: python:3.9-slim
+    depends_on:
+      - nifi
+    volumes:
+      - ./nifi:/app/nifi
+    working_dir: /app
+    environment:
+      - NIFI_URL=https://nifi:8443/nifi-api
+      - NIFI_USERNAME=admin
+      - NIFI_PASSWORD=admin123456789
+      - FLOW_JSON_PATH=nifi/flow.json
+    command: sh -c "pip install requests -q && python nifi/deploy_nifi_flow.py"
+
+  nifi:
+    image: apache/nifi:1.23.2
+    platform: linux/amd64
+    ports:
+      - "8443:8443"
+    environment:
+      - NIFI_WEB_PROXY_HOST=localhost:8443,nifi:8443
+      - SINGLE_USER_CREDENTIALS_USERNAME=admin
+      - SINGLE_USER_CREDENTIALS_PASSWORD=admin123456789
+    volumes:
+      - ./data:/data
+
+volumes:
+  postgres_data:

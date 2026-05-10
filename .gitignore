@@ -1,0 +1,15 @@
+# Java
+rest-api/target/
+
+# Data
+data/
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+
+# macOS
+.DS_Store

@@ -1,0 +1,523 @@
+{
+  "encodingVersion": "2",
+  "flowContents": {
+    "identifier": "a1b2c3d4-0000-0000-0000-000000000000",
+    "name": "File Reader Pipeline",
+    "position": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "processors": [
+      {
+        "identifier": "a1b2c3d4-0001-0000-0000-000000000000",
+        "name": "GetFile",
+        "position": {
+          "x": 100.0,
+          "y": 100.0
+        },
+        "type": "org.apache.nifi.processors.standard.GetFile",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.28.1"
+        },
+        "properties": {
+          "Input Directory": "/data",
+          "File Filter": "[^\\.].*\\.csv",
+          "Keep Source File": "false",
+          "Recurse Subdirectories": "false"
+        },
+        "schedulingPeriod": "10 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "style": {}
+      },
+      {
+        "identifier": "a1b2c3d4-0013-0000-0000-000000000000",
+        "name": "FixTimestampNewlines",
+        "position": {
+          "x": 300.0,
+          "y": 100.0
+        },
+        "type": "org.apache.nifi.processors.standard.ReplaceText",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.28.1"
+        },
+        "properties": {
+          "Replacement Value": "$1$2",
+          "Replacement Strategy": "Regex Replace",
+          "Evaluation Mode": "Entire text",
+          "Regular Expression": "(\\d\\d\\d\\d-\\d\\d-\\d\\dT[\\d:Z]*)\\n([\\d:Z]*,)"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [
+          "failure"
+        ],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "style": {}
+      },
+      {
+        "identifier": "a1b2c3d4-0014-0000-0000-000000000000",
+        "name": "FilterRows",
+        "position": {
+          "x": 500.0,
+          "y": 100.0
+        },
+        "type": "org.apache.nifi.processors.script.ExecuteScript",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-scripting-nar",
+          "version": "1.28.1"
+        },
+        "properties": {
+          "Script Engine": "Groovy",
+          "Script Body": "import org.apache.commons.io.IOUtils\nimport java.nio.charset.StandardCharsets\nimport java.time.Instant\nimport java.util.Currency\n\ndef flowFile = session.get()\nif (!flowFile) return\n\nflowFile = session.write(flowFile, { inputStream, outputStream ->\n    def lines = IOUtils.readLines(inputStream, StandardCharsets.UTF_8)\n    if (lines.isEmpty()) { return }\n    def header = lines[0]\n    def uuidPat    = ~/[0-9a-zA-Z]{8}-[0-9a-zA-Z]{4}-[0-9a-zA-Z]{4}-[0-9a-zA-Z]{4}-[0-9a-zA-Z]{12}/\n    def accountPat = ~/GIG-USR-\\d+/\n    def sb = new StringBuilder()\n    sb.append(header).append('\\n')\n    lines.drop(1).each { line ->\n        if (!line.trim()) return\n        def cols = line.split(',')\n        if (cols.size() < 6) return\n        if (!(cols[0].trim() ==~ uuidPat))    return\n        if (!(cols[1].trim() ==~ accountPat)) return\n        try { new BigDecimal(cols[2].trim()) } catch (Exception e) { return }\n        try { Currency.getInstance(cols[3].trim()) } catch (Exception e) { return }\n        try { Instant.parse(cols[4].trim()) }  catch (Exception e) { return }\n        if (cols[5].trim() != 'SUCCESS') return\n        sb.append(line).append('\\n')\n    }\n    outputStream.write(sb.toString().getBytes(StandardCharsets.UTF_8))\n} as org.apache.nifi.processor.io.StreamCallback)\n\nsession.transfer(flowFile, REL_SUCCESS)"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [
+          "failure"
+        ],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "style": {}
+      },
+      {
+        "identifier": "a1b2c3d4-0008-0000-0000-000000000000",
+        "name": "DeduplicateCSV",
+        "position": {
+          "x": 700.0,
+          "y": 100.0
+        },
+        "type": "org.apache.nifi.processors.script.ExecuteScript",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-scripting-nar",
+          "version": "1.28.1"
+        },
+        "properties": {
+          "Script Engine": "Groovy",
+          "Script Body": "import org.apache.commons.io.IOUtils\nimport java.nio.charset.StandardCharsets\n\ndef flowFile = session.get()\nif (!flowFile) return\n\nflowFile = session.write(flowFile, { inputStream, outputStream ->\n    def lines = IOUtils.readLines(inputStream, StandardCharsets.UTF_8)\n    if (lines.isEmpty()) { return }\n    def header = lines[0]\n    def records = [:]\n    lines.drop(1).each { line ->\n        if (!line.trim()) return\n        def cols = line.split(',')\n        if (cols.size() < 3) return\n        def id = cols[0].trim()\n        if (id.isEmpty()) return\n        try {\n            def amount = new BigDecimal(cols[2].trim())\n            if (!records.containsKey(id) || amount > (records[id][1] as BigDecimal)) {\n                records[id] = [line, amount]\n            }\n        } catch (Exception ignored) {}\n    }\n    def sb = new StringBuilder()\n    sb.append(header).append('\\n')\n    records.values().each { entry -> sb.append(entry[0]).append('\\n') }\n    outputStream.write(sb.toString().getBytes(StandardCharsets.UTF_8))\n} as org.apache.nifi.processor.io.StreamCallback)\n\nsession.transfer(flowFile, REL_SUCCESS)"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [
+          "failure"
+        ],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "style": {}
+      },
+      {
+        "identifier": "a1b2c3d4-0010-0000-0000-000000000000",
+        "name": "DeadLetterPutFile",
+        "position": {
+          "x": 800.0,
+          "y": 300.0
+        },
+        "type": "org.apache.nifi.processors.standard.PutFile",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.28.1"
+        },
+        "properties": {
+          "Directory": "/data/errors",
+          "Conflict Resolution Strategy": "replace",
+          "Create Missing Directories": "true"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [
+          "success",
+          "failure"
+        ],
+        "scheduledState": "ENABLED",
+        "retryCount": 0,
+        "retriedRelationships": [],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "style": {}
+      },
+      {
+        "identifier": "a1b2c3d4-0027-0000-0000-000000000000",
+        "name": "PublishKafka",
+        "position": {
+          "x": 1300.0,
+          "y": 100.0
+        },
+        "type": "org.apache.nifi.processors.kafka.pubsub.PublishKafka_2_6",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-kafka-2-6-nar",
+          "version": "1.28.1"
+        },
+        "properties": {
+          "bootstrap.servers": "kafka:9092",
+          "topic": "transactions",
+          "use-transactions": "false"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "executionNode": "ALL",
+        "penaltyDuration": "30 sec",
+        "yieldDuration": "1 sec",
+        "bulletinLevel": "WARN",
+        "runDurationMillis": 0,
+        "concurrentlySchedulableTaskCount": 1,
+        "autoTerminatedRelationships": [
+          "success"
+        ],
+        "scheduledState": "ENABLED",
+        "retryCount": 10,
+        "retriedRelationships": [
+          "failure"
+        ],
+        "backoffMechanism": "PENALIZE_FLOWFILE",
+        "maxBackoffPeriod": "10 mins",
+        "style": {}
+      },
+      {
+        "identifier": "a1b2c3d4-0028-0000-0000-000000000000",
+        "name": "SplitText",
+        "type": "org.apache.nifi.processors.standard.SplitText",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.23.2"
+        },
+        "position": {
+          "x": 900.0,
+          "y": 200.0
+        },
+        "properties": {
+          "Line Split Count": "1",
+          "Header Line Count": "1",
+          "Remove Trailing Newlines": "true"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "autoTerminatedRelationships": [
+          "original"
+        ]
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "a1b2c3d4-0011-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0008-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0010-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "a1b2c3d4-0015-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0001-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0013-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "a1b2c3d4-0016-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0013-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0014-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "a1b2c3d4-0017-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0014-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0008-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "a1b2c3d4-0018-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0013-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0010-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "a1b2c3d4-0019-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0014-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0010-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "a1b2c3d4-0028-0000-0000-000000000000",
+        "name": "",
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "source": {
+          "id": "a1b2c3d4-0027-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0010-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB",
+        "flowFileExpiration": "0 sec",
+        "prioritizers": [],
+        "bends": [],
+        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
+        "partitioningAttribute": "",
+        "loadBalanceCompression": "DO_NOT_COMPRESS"
+      },
+      {
+        "identifier": "conn-dedup-splittext",
+        "source": {
+          "id": "a1b2c3d4-0008-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0028-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      },
+      {
+        "identifier": "conn-splittext-kafka",
+        "source": {
+          "id": "a1b2c3d4-0028-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0027-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "splits"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      },
+      {
+        "identifier": "conn-splittext-dead",
+        "source": {
+          "id": "a1b2c3d4-0028-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0010-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      }
+    ],
+    "inputPorts": [],
+    "outputPorts": [],
+    "funnels": [],
+    "labels": [],
+    "controllerServices": [],
+    "defaultFlowFileExpiration": "0 sec",
+    "defaultBackPressureObjectThreshold": 10000,
+    "defaultBackPressureDataSizeThreshold": "1 GB"
+  }
+}
