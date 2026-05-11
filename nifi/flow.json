@@ -250,6 +250,47 @@
         "autoTerminatedRelationships": [
           "original"
         ]
+      },
+      {
+        "identifier": "a1b2c3d4-0029-0000-0000-000000000000",
+        "name": "IncrementRetryCount",
+        "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-update-attribute-nar",
+          "version": "1.23.2"
+        },
+        "position": {
+          "x": 1100.0,
+          "y": 400.0
+        },
+        "properties": {
+          "retry.count": "${retry.count:plus(1)}"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "autoTerminatedRelationships": []
+      },
+      {
+        "identifier": "a1b2c3d4-0030-0000-0000-000000000000",
+        "name": "RouteOnRetryCount",
+        "type": "org.apache.nifi.processors.standard.RouteOnAttribute",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.23.2"
+        },
+        "position": {
+          "x": 1100.0,
+          "y": 600.0
+        },
+        "properties": {
+          "Routing Strategy": "Route to Property name",
+          "retry": "${retry.count:lt(3)}"
+        },
+        "schedulingPeriod": "0 sec",
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "autoTerminatedRelationships": []
       }
     ],
     "connections": [
@@ -428,35 +469,6 @@
         "loadBalanceCompression": "DO_NOT_COMPRESS"
       },
       {
-        "identifier": "a1b2c3d4-0028-0000-0000-000000000000",
-        "name": "",
-        "position": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "source": {
-          "id": "a1b2c3d4-0027-0000-0000-000000000000",
-          "type": "PROCESSOR",
-          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
-        },
-        "destination": {
-          "id": "a1b2c3d4-0010-0000-0000-000000000000",
-          "type": "PROCESSOR",
-          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
-        },
-        "selectedRelationships": [
-          "failure"
-        ],
-        "backPressureObjectThreshold": 10000,
-        "backPressureDataSizeThreshold": "1 GB",
-        "flowFileExpiration": "0 sec",
-        "prioritizers": [],
-        "bends": [],
-        "loadBalanceStrategy": "DO_NOT_LOAD_BALANCE",
-        "partitioningAttribute": "",
-        "loadBalanceCompression": "DO_NOT_COMPRESS"
-      },
-      {
         "identifier": "conn-dedup-splittext",
         "source": {
           "id": "a1b2c3d4-0008-0000-0000-000000000000",
@@ -506,6 +518,78 @@
         },
         "selectedRelationships": [
           "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      },
+      {
+        "identifier": "conn-00000000-00000000-failure",
+        "source": {
+          "id": "a1b2c3d4-0027-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0029-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "failure"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      },
+      {
+        "identifier": "conn-00000000-00000000-success",
+        "source": {
+          "id": "a1b2c3d4-0029-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0030-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "success"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      },
+      {
+        "identifier": "conn-00000000-00000000-retry",
+        "source": {
+          "id": "a1b2c3d4-0030-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0027-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "retry"
+        ],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      },
+      {
+        "identifier": "conn-00000000-00000000-unmatched",
+        "source": {
+          "id": "a1b2c3d4-0030-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "destination": {
+          "id": "a1b2c3d4-0010-0000-0000-000000000000",
+          "type": "PROCESSOR",
+          "groupId": "a1b2c3d4-0000-0000-0000-000000000000"
+        },
+        "selectedRelationships": [
+          "unmatched"
         ],
         "backPressureObjectThreshold": 10000,
         "backPressureDataSizeThreshold": "1 GB"

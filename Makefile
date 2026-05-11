@@ -2,6 +2,7 @@
         nifi-open \
         kafka-consume kafka-offsets \
         db-list db-count db-totals \
+        report \
         clean
 
 KAFKA  := $(shell docker compose ps -q kafka)
@@ -43,6 +44,12 @@ kafka-offsets:
 		/opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell \
 		--broker-list localhost:9092 \
 		--topic transactions
+
+# --- Report ---
+
+report:
+	@test -n "$(CSV)" || (echo "Usage: make report CSV=<path/to/source.csv>"; exit 1)
+	python3 report.py $(CSV)
 
 # --- PostgreSQL ---
 

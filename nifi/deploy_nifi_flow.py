@@ -137,6 +137,13 @@ def create_connection(session, group_id, conn_def, id_map, root_group_id):
     return r.json()
 
 
+def start_all_processors(session, group_id):
+    body = {"id": group_id, "state": "RUNNING", "disconnectedNodeAcknowledged": False}
+    r = session.put(f"{NIFI_URL}/flow/process-groups/{group_id}", json=body, verify=False)
+    r.raise_for_status()
+    print("All processors started.")
+
+
 def main():
     with open(FLOW_JSON_PATH) as f:
         flow = json.load(f)
@@ -188,6 +195,7 @@ def main():
             result = create_connection(session, root_id, conn, id_map, root_id)
             print(f"Created connection -> {result['id']}")
 
+    start_all_processors(session, root_id)
     print("Flow deployed successfully.")
 
 
