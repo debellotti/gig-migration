@@ -2,7 +2,8 @@
 rest-api/target/
 
 # Data
-data/
+data/errors
+data/rest-api
 
 # Python
 __pycache__/
